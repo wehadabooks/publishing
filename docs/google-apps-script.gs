@@ -4,10 +4,10 @@
 //
 // 설정 방법: docs/구글연동가이드.md 참고
 
-// ── 설정 (관장님이 채울 것) ──────────────────────────────────────
+// ── 설정 (실제 값은 docs/google-apps-script.local.gs 참고 — 커밋 금지) ──
 var SHEET_ID = "여기에_구글시트_ID";        // 시트 URL의 /d/와 /edit 사이 문자열
-var FOLDER_ID = "여기에_드라이브_폴더_ID";  // 투고함 폴더 URL의 /folders/ 뒤 문자열
-var API_TOKEN = "여기에_아무_비밀문자열";   // n8n과 약속하는 비밀키 (예: wehada-2026-xxxx)
+var FOLDER_NAME = "위하다_투고함";  // Drive에 이 이름의 폴더가 없으면 자동 생성
+var API_TOKEN = "여기에_아무_비밀문자열";   // n8n 스크립트/.env의 APPS_SCRIPT_TOKEN과 동일하게
 
 var SHEET_NAME = "투고";
 var HEADER = ["접수일", "이름", "이메일", "연락처", "장르", "제목", "분량",
@@ -16,6 +16,11 @@ var HEADER = ["접수일", "이름", "이메일", "연락처", "장르", "제목
 // 컬럼 인덱스 (1-based)
 var COL_TITLE = 6, COL_FILENAME = 10, COL_FILEID = 11, COL_STATUS = 12, COL_PIPELINE = 13;
 
+function getFolder() {
+  var it = DriveApp.getFoldersByName(FOLDER_NAME);
+  return it.hasNext() ? it.next() : DriveApp.createFolder(FOLDER_NAME);
+}
+
 function getSheet() {
   var ss = SpreadsheetApp.openById(SHEET_ID);
   var sheet = ss.getSheetByName(SHEET_NAME);
@@ -23,6 +28,12 @@ function getSheet() {
     sheet = ss.insertSheet(SHEET_NAME);
     sheet.appendRow(HEADER);
     sheet.setFrozenRows(1);
+    // 상태 열에 드롭다운 (검토중/진행/반려/보류)
+    var rule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(["검토중", "진행", "반려", "보류"], true)
+      .setAllowInvalid(false)
+      .build();
+    sheet.getRange(2, COL_STATUS, sheet.getMaxRows() - 1, 1).setDataValidation(rule);
   }
   return sheet;
 }
@@ -39,8 +50,7 @@ function doPost(e) {
       data.mimeType || "application/octet-stream",
       data.fileName
     );
-    var folder = DriveApp.getFolderById(FOLDER_ID);
-    var saved = folder.createFile(blob);
+    var saved = getFolder().createFile(blob);
     // 파일명: 제목_저자명_원본파일명 으로 정리
     saved.setName(data.title + "_" + data.name + "_" + data.fileName);
     fileName = saved.getName();
