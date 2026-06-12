@@ -38,9 +38,23 @@ function getSheet() {
   return sheet;
 }
 
-// ── ① 투고 접수 (웹사이트 → 여기) ───────────────────────────────
+// ── ① 투고 접수 + 오픈 알림 신청 (웹사이트 → 여기) ──────────────
 function doPost(e) {
   var data = JSON.parse(e.postData.contents);
+
+  // 허브 사이트의 오픈 알림 신청 → "오픈알림" 탭에 기록
+  if (data.type === "notify") {
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    var notifySheet = ss.getSheetByName("오픈알림");
+    if (!notifySheet) {
+      notifySheet = ss.insertSheet("오픈알림");
+      notifySheet.appendRow(["신청일", "사업", "이메일"]);
+      notifySheet.setFrozenRows(1);
+    }
+    notifySheet.appendRow([new Date(), data.business, data.email]);
+    return ContentService.createTextOutput(JSON.stringify({ ok: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
 
   var fileName = "";
   var fileId = "";
